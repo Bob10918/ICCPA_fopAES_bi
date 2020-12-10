@@ -8,6 +8,7 @@
 #include "iccpa.h"
 
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -19,29 +20,71 @@
 
 #define KEY_SIZE 16     //key size in byte
 
-void print_guesses(char** guesses);
-void recursive_print(char** current_key, int index, char** guesses);
+void help();
+void print_guesses(int index, uint8_t** guesses);
 
 int main(int argc, char** argv) {
     
-    FILE* infile = fopen(argv[1], "r");
+    char* file_name = NULL;
+    
+    //Set parameters to default value
+    n = 30;     //number of power traces for each message
+    l = 15;     //number of samples per clock
+    threshold = 0.7;        //threshold beyond which collision is accepted
+    M = -1;     //number of different messages, each one being encrypted n times (set to -1 to check if user insert a different value)
+    
+    //Read parameters from command line argument
+    opterr = 0;
+    char c;
+    while ((c = getopt (argc, argv, "f:n:l:m:t:h")) != -1)
+        switch (c)
+        {
+        case 'f':
+            file_name = optarg;
+            break;
+        case 'n':
+            n = atoi(optarg);
+            break;
+        case 'l':
+            l = atoi(optarg);
+            break;
+        case 'm':
+            M = atoi(optarg);
+            break;
+        case 't':
+            threshold = (float) strtof(optarg, NULL);
+            break;
+        case 'h':
+            help();
+            return 1;
+            break;
+        case '?':
+            if (optopt == 'c')
+                fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+            else if (isprint (optopt))
+                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+            else
+                fprintf (stderr,
+                    "Unknown option character `\\x%x'.\n",
+                    optopt);
+            return 1;
+            abort ();
+        }
+      
+    if(file_name==NULL){
+        printf("Parameter -f is required\n");
+        return 1;
+    }  
+    FILE* infile = fopen(file_name, "r");
     fread(&N, sizeof(uint32_t), 1, infile);
-    int N_print = N;      //only for debugging
-    n = 30;     //could be set to a different value
+    if(M==-1) M = N;      //set to N if user hasn't inserted a custom value
     fread(&nsamples, sizeof(uint32_t), 1, infile);
-    l = 15;      //could be set at nsamples/KEY_SIZE/number_of_rounds
     fread(&sampletype, sizeof(char), 1, infile);
-    char st = sampletype;
     uint8_t plaintextlen_temp;
     fread(&plaintextlen_temp, sizeof(uint8_t), 1, infile);
     plaintextlen = (int) plaintextlen_temp;
-    int ptl = plaintextlen;     //only for debugging
     
-    M = N;      //could be changed
-    threshold = 0.9;    //could be changed
-    int max_threads = 100;
-    
-    char** guesses;
+    uint8_t** guesses;
     
     switch (sampletype){
         case 'f':
@@ -56,58 +99,60 @@ int main(int argc, char** argv) {
             exit(-1);
     }
     
-    print_guesses(guesses);
+    print_guesses(0, guesses);
     
+    //free memory
+    for(int i=0; i<KEY_SIZE; i++){
+        if(guesses[i]!=NULL){
+            free(guesses[i]);
+        }
+    }
+    free(guesses);
     return (EXIT_SUCCESS);
 }
 
 /*
- * Prints all the possible keys according to the guesses obtained from traces
+ * Show a brief help
  */
-void print_guesses(char** guesses){
-    char* current_key = "";
-    recursive_print(guesses, 0, guesses);
+void help(){
+    printf("Improved Collision-Correlation Power Analysis on First Order Protected AES (for Blinded Inversion implementations)\n");
+    printf("Usage: iccpa_fopaes_bi <file> <options>\n");
+    printf("    <file> argument is required\n");
+    printf("    Options:\n");
+    printf("    -n      Specify number of power traces for each message (default: 30)\n");
+    printf("    -l      Specify number of samples per clock (default: 15)\n");
+    printf("    -m      Specify number of different messages, each one being encrypted n times (default: number of power traces in given file)\n");
+    printf("    -t      Specify threshold beyond which collision is accepted, in range 0 to 1 (default: 0.9)\n");
+    printf("    -h      Show this help\n");
 }
 
 /*
- * Recursive functions that create all the possible key starting from guesses
+ * Recursive functions that prints all the possible key starting from guesses
  */
-void recursive_print(char** current_key, int index, char** guesses){
+void print_guesses(int index, uint8_t** guesses){
     if(index==KEY_SIZE){
         for(int i=0; i<KEY_SIZE; i++){
-            if(current_key[i] == NULL){
-                printf("NULL ");
+            if(guesses[i] == NULL){
+                printf("XX");
             }
             else{
-                printf("%x ", *(current_key[i]));
+                printf("%02x", *(guesses[i])& 0xff);
             }
         }
         printf("\n");
         return;
     }
     else{
-        char* next_key[KEY_SIZE];
-        for(int i=0; i<index; i++){
-            if(current_key[i]==NULL){
-                next_key[i] = NULL;
-            }
-            else{
-                next_key[i] = malloc(sizeof(char));
-                *(next_key[i]) = *(current_key[i]);
-            }
-        }
         if(guesses[index]==NULL){
-            next_key[index] = NULL;
-            recursive_print(next_key, index+1, guesses);
+            print_guesses(index+1, guesses);
             return;
         }
         else{
-            next_key[index] = malloc(sizeof(char));
-            *(next_key[index]) = *(guesses[index]);
-            recursive_print(next_key, index+1, guesses);
-        
-            *(next_key[index]) = (*(guesses[index]))+1;
-            recursive_print(next_key, index+1, guesses);
+            print_guesses(index+1, guesses);
+            
+            *(guesses[index]) += 1;
+            print_guesses(index+1, guesses);
+            *(guesses[index]) -= 1;
             return;
         }
     }
