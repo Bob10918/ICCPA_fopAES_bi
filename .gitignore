@@ -1,0 +1,6 @@
+/build/
+/dist/
+/nbproject/
+*.o
+iccpa_fopaes_bi
+.dep.inc
