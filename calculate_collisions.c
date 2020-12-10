@@ -248,8 +248,8 @@ uint8_t** ANALYZE_TRACES(DATA_TYPE)(){
         args->T = T;
         pthread_create(&(running_threads[i]), NULL, FIND_COLLISIONS(DATA_TYPE), (void* ) args);
     }
+    void** rv = NULL;
     for(int j=0; j<KEY_SIZE; j++){
-        void** rv;
         pthread_join(running_threads[j], rv);
         if(rv == NULL){
             guesses[j]=NULL;
