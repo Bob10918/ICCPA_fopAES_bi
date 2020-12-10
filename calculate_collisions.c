@@ -23,6 +23,7 @@
 #define KEY_SIZE 16     //key size in byte
 
 
+//functions names definition (generate function name basing on data type passed)
 #define MAKE_FN_NAME(name, type) name ## _ ## type
 #define THREAD_ARGS(type) MAKE_FN_NAME(Thread_args, type)
 #define CALCULATE_COLLISIONS(type) MAKE_FN_NAME(calculate_collisions, type)
@@ -52,7 +53,7 @@ DATA_TYPE OPTIMIZED_PEARSON(DATA_TYPE) (DATA_TYPE** T, int theta0, int theta1, D
 
 
 /*
- * Calculate COLLISION(DATA_TYPE)s starting from the power traces
+ * Calculate collisions starting from the power traces
  */
 uint8_t** CALCULATE_COLLISIONS(DATA_TYPE) (FILE* infile){
     
@@ -179,7 +180,7 @@ DATA_TYPE OPTIMIZED_PEARSON(DATA_TYPE)(DATA_TYPE** T, int theta0, int theta1, DA
 }
 
 /*
- * Compute COVARIANCE(DATA_TYPE) of given samples in the given time sequences
+ * Compute convariance of given samples in the given time sequences
  */
 DATA_TYPE COVARIANCE(DATA_TYPE)(DATA_TYPE** T, int theta0, int theta1, int t, DATA_TYPE* sum_array){
     int i;
@@ -208,7 +209,7 @@ DATA_TYPE STANDARD_DEVIATION(DATA_TYPE)(DATA_TYPE** T, int theta, int t){
  * key byte to guess
  */
 uint8_t** ANALYZE_TRACES(DATA_TYPE)(){
-    //T[BYTE_SPACE/2][n][l*2]
+    //T structure: T[BYTE_SPACE/2][n][l*2]
     DATA_TYPE*** T;
     DATA_TYPE temp[l];
     int byte_value;
@@ -248,7 +249,7 @@ uint8_t** ANALYZE_TRACES(DATA_TYPE)(){
         args->T = T;
         pthread_create(&(running_threads[i]), NULL, FIND_COLLISIONS(DATA_TYPE), (void* ) args);
     }
-    void** rv = NULL;
+    void** rv = malloc(sizeof(void*));
     for(int j=0; j<KEY_SIZE; j++){
         pthread_join(running_threads[j], rv);
         if(rv == NULL){
@@ -262,7 +263,7 @@ uint8_t** ANALYZE_TRACES(DATA_TYPE)(){
 }
 
 /*
- * Check COLLISION(DATA_TYPE)s inside a given key byte
+ * Check collisions inside a given key byte
  */
 void* FIND_COLLISIONS(DATA_TYPE)(void* args){
     THREAD_ARGS(DATA_TYPE)* args_casted = (THREAD_ARGS(DATA_TYPE)*) args;
@@ -278,8 +279,7 @@ void* FIND_COLLISIONS(DATA_TYPE)(void* args){
     for(i=0; i<(BYTE_SPACE/2); i++){    
         COMPUTE_ARRAYS(DATA_TYPE)(T[i], sum_array, std_dev_array);
         if(COLLISION(DATA_TYPE)(T[i], 0, l, sum_array, std_dev_array, max_correlation)){
-            /* if a collision is detected, the corresponding byte value is returned
-             */
+            // if a collision is detected, the corresponding byte value is returned
             found = TRUE;
             *guessed_byte = i*2;
         }

@@ -3,4 +3,6 @@
 /nbproject/
 *.o
 iccpa_fopaes_bi
+iccpa_fopaes_bi_temp/
 .dep.inc
+*.dat
